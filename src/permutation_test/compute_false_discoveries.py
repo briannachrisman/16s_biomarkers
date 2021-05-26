@@ -1,57 +1,55 @@
-# Set up libraries, etc.
-import pandas as pd
+import glob
 import numpy as np
-import seaborn as sns
-from collections import Counter
-import scipy.stats as ss
-import tqdm
-import matplotlib.pyplot as plt
-import seaborn as sns
-from statsmodels.stats.multitest import multipletests
-from scipy.stats import wilcoxon
-from scipy.stats import mannwhitneyu
-from scipy import stats
-from time import time
+import pandas as pd
 import sys
+import scipy.sparse
+from tqdm import tqdm
+from collections import Counter
+import scipy.stats
+from matplotlib import pyplot as plt
+import sklearn.linear_model
+import sklearn.model_selection
+import sklearn.metrics
+import multiprocessing
 
-PROJECT_DIR = '/home/groups/dpwall/briannac/sequence_based_biomarkers/'
+cpus = multiprocessing.cpu_count()
+BIOMARKER_DIR = '/home/groups/dpwall/briannac/sequence_based_biomarkers/'
 
+dataset = sys.argv[1]
+biomarker = sys.argv[2]
 
-BIOMARKER_FILE =  sys.argv[1]
-AUTISM_OR_OBESITY = sys.argv[2]
-START = int(sys.argv[3])
-STOP = int(sys.argv[4])
-DATA_PVALS_FILE = sys.argv[5]
-FD_COUNT_FILE = sys.argv[6]
+pvals_data = sorted(np.load(BIOMARKER_DIR + 'results/pvalues/pvals_%s_%s.npy' % (dataset, biomarker)))
+permuted_phenos = np.load(BIOMARKER_DIR + 'intermediate_files/permutation_test/%s_phenos_permuted.npy' % dataset).astype(bool)
+def countEleLessThanOrEqual(arr1, arr2):
+    counts = np.zeros(len(arr1))
+    for i in range(len(arr1)):
+        count = 0
+        for j in range(len(arr2)):
+            if (arr2[j] < arr1[i]):
+                count+= 1
+        counts[i] = count
+    return counts
 
-print('Loading files...')
-biomarkers = np.load(BIOMARKER_FILE)
-biomarkers = biomarkers[:,((biomarkers>0).mean(axis=0)>=.1)] # Only include biomarkers in >= 10% of population.
-
-if AUTISM_OR_OBESITY=='obesity':
-    person_vs_taxa = pd.read_table(PROJECT_DIR + 'data/obese_lean_twins/person_vs_taxa.tsv')
-    metadata =  pd.read_table(PROJECT_DIR + 'data/obese_lean_twins/metadata.tsv', index_col=0)
-    metadata = metadata.loc[person_vs_taxa.index]
-    metadata['phenotype'] = metadata.obesitycat=='Obese'
-    permuted_phenos = np.load(PROJECT_DIR + 'intermediate_files/permutation_test/obesity_phenos_permuted.npy').astype(bool)
-    phenos = metadata.phenotype
-elif AUTISM_OR_OBESITY=='autism':
-    person_vs_taxa = pd.read_table(PROJECT_DIR + 'data/yogurt/person_vs_taxa.tsv')
-    metadata =  pd.read_table(PROJECT_DIR + 'data/yogurt/metadata.tsv', index_col=0)
-    metadata = metadata.loc[person_vs_taxa.index]
-    metadata.phenotype = metadata.phenotype=='A'
-    phenos = metadata.phenotype
-    permuted_phenos = np.load(PROJECT_DIR + 'intermediate_files/permutation_test/autism_phenos_permuted.npy').astype(bool)
-
-else:
-    print('ERROR -- need to specify autism or obesity')
-
-data_pvalues = np.loadtxt(DATA_PVALS_FILE)[START:STOP]
-
-p_values = [[
-    -np.log10(wilcoxon(biomarkers[permuted_pheno, i], biomarkers[~permuted_pheno, i]).pvalue) for permuted_pheno in permuted_phenos
-] for data_i, i in tqdm.tqdm(enumerate(range(START, min(STOP,np.shape(biomarkers)[1]))))]
-fd_counts = [sum([sum(p>=data_p) for p in p_values]) for data_p in sorted(data_pvalues)]
-with open(FD_COUNT_FILE, 'w') as f:
-    writer = csv.writer(f, delimiter="\t")
-    writer.writerow(fd_counts)
+pvals_count = np.zeros(len(pvals_data)).astype(int)
+step_size=100000
+n_iters=10 #len(permuted_phenos)
+person_biomarker = scipy.sparse.load_npz(BIOMARKER_DIR + 'results/generate_biomarkers/sample_vs_biomarker_%s_%s.npz' % (biomarker, dataset))
+print('person x biomarker shape: ', np.shape(person_biomarker))
+for chunk_start in tqdm(np.arange(0,np.shape(person_biomarker)[1], step=step_size)):
+    chunk_end = min(chunk_start+step_size, np.shape(person_biomarker)[1])
+    person_biomarker_current = person_biomarker[:,chunk_start:chunk_end].toarray()
+    
+    for i in range(n_iters):
+        affected = person_biomarker_current[permuted_phenos[i],:]
+        unaffected = person_biomarker_current[~permuted_phenos[i],:]
+        if 'autism' in dataset:
+            pvals_permute = [scipy.stats.wilcoxon(
+                affected[:,i],
+                unaffected[:,i]).pvalue for i in range(np.shape(person_biomarker_current)[1])]
+        elif 'obesity' in dataset:
+            pvals_permute = [scipy.stats.mannwhitneyu(
+                affected[:,i],
+                unaffected[:,i]).pvalue for i in range(np.shape(person_biomarker_current)[1])]
+        pvals_count = pvals_count + countEleLessThanOrEqual(pvals_data, pvals_permute)
+fdr = [p/(i-1)/n_iters for i,p in enumerate(pvals_count)]
+np.save(BIOMARKER_DIR + 'results/permutation_test/fdr_%s_%s.npy' % (dataset, biomarker))

@@ -19,7 +19,7 @@ variant_list_filename = RESULTS_DIR + '/biomarker_names_sbb1_%s.txt' % dataset
 
 asv_vs_biomarker_file_out = RESULTS_DIR + '/asv_vs_biomarker_sbb%i_%s.npz' % (order, dataset)
 biomarker_names_file_out = RESULTS_DIR + '/biomarker_names_sbb%i_%s.txt' % (order, dataset)
-person_biomarker_file_out = RESULTS_DIR + '/person_biomarker_sbb%i_%s.npz' % (order, dataset)
+person_biomarker_file_out = RESULTS_DIR + '/sample_vs_biomarker_sbb%i_%s.npz' % (order, dataset)
 
 
 asv = []
@@ -38,8 +38,8 @@ print('Data loaded: ', 'people', len(people), 'asv', len(asv), 'variants', len(v
 
 m, n = asv_variant.shape
 cached_combs = np.zeros((n, order+1), dtype=int)
-for i in range(n):
-    cached_combs[i, :] = [comb(i, x) for x in range(order+1)]
+for i in range(n): # For each variant:
+    cached_combs[i, :] = [comb(i, x) for x in range(order+1)] # Number of 
 
 r = int(comb(n, order))
 print('Number of possible biomarkers: ', r)
@@ -70,7 +70,8 @@ biomarker_mapping = np.cumsum(biomarker_exists)-1
 
 # now calculate person_biomarker
 person_biomarker =scipy.sparse.dok_matrix((len(people), np.sum(biomarker_exists)), dtype=np.float64)
-asv_biomarker = scipy.sparse.dok_matrix((len(asv), np.sum(biomarker_exists)), dtype=bool)
+asv_biomarker = np.zeros((len(asv), np.sum(biomarker_exists)), dtype=np.float64)
+person_biomarker = np.zeros((len(people), np.sum(biomarker_exists)), dtype=np.float64)
 
 print("Computing person_vs_biomarker and asv_vs_biomarker...")
 for asv_index in tqdm(range(len(asv))):
@@ -85,7 +86,10 @@ for asv_index in tqdm(range(len(asv))):
     person_indices = np.where(person_asv[:, asv_index])[0]
     person_biomarker[np.ix_(person_indices, biomarker_mapping[biomarker_indices])] += np.outer(person_asv[person_indices, asv_index], np.ones((num_indices,)))
     asv_biomarker[asv_index,biomarker_mapping[biomarker_indices]] = True
-    
+
+print("Converting to sparse format...")    
+
+
 def sparse_unique_columns(M):
     M = M.tocsc()
     m, n = M.shape
@@ -123,38 +127,54 @@ def sparse_unique_columns(M):
                                    np.arange(nu + 1)), (n, nu))
     return uniques, idx[counts[:-1].cumsum()], counts[1:]
 
+
 print('Computing biomarkers in LD....')
-_, no_ld_idx, _ = sparse_unique_columns(asv_biomarker)
-no_ld_idx = sorted(no_ld_idx)
+
+is_abundant = np.where((person_biomarker>0).mean(axis=0)>.1)[0]
+print(len(is_abundant), ' biomarkers > 10% freq')
+
+is_diverse = np.where((person_biomarker>.9).mean(axis=0)<.9)[0]
+print(len(is_diverse), ' biomarkers < 90% high-abundance freq')
+
+
+asv_biomarker = scipy.sparse.csr_matrix(asv_biomarker)
+person_biomarker = scipy.sparse.csr_matrix(person_biomarker)
+
+_, no_ld_idx, _ = sparse_unique_columns(person_biomarker)
 
 print("Number of biomarkers after LD filtering: ", len(no_ld_idx))
+
+
+good_idx = set(is_abundant).intersection(no_ld_idx).intersection(is_diverse)
+good_idx_sort = sorted(list(good_idx))
+asv_biomarker = asv_biomarker[:,good_idx_sort]
+person_biomarker = person_biomarker[:,good_idx_sort]
+print(len(good_idx), ' biomarkers left')
+
 
 #np.save('%sperson_variant%d_condensed' %  (output_dir,order), person_biomarker)
 biomarkers = combinations(range(len(variants)), order)
 print('Computing biomarker names...')
 
-#asv_biomarker = scipy.sparse.csr_matrix(asv_biomarker[:,no_ld_idx])
-person_biomarker = scipy.sparse.csr_matrix(person_biomarker[:,no_ld_idx])
-
-is_abundant = ((person_biomarker>0).mean(axis=0)>.1).tolist()[0]
-print(sum(is_abundant), ' biomarkers > 10% freq')
-asv_biomarker = asv_biomarker[:,np.where(is_abundant)[0]]
-person_biomarker = person_biomarker[:,np.where(is_abundant)[0]]
+#asv_biomarker = asv_biomarker[:,np.where(is_abundant)[0]]
+#person_biomarker = person_biomarker[:,np.where(is_abundant)[0]]
 
 unique_idx_current = 0
 current_idx = 0
 with open(biomarker_names_file_out, 'w') as f:
     for i,biomarker in tqdm(enumerate(biomarkers)):
         if biomarker_exists[i]:  # If biomarker doesn't even exist, just skip.
-            if unique_idx_current==len(no_ld_idx):
-                break
-            elif current_idx==no_ld_idx[unique_idx_current]:
-                if is_abundant[unique_idx_current]: 
-                    f.write('\t'.join([variants[x] for x in biomarker]) + '\t' + '\t'.join([str(x) for x in biomarker]) + '\n')
-                unique_idx_current += 1
+            if current_idx in good_idx: f.write('\t'.join([variants[x] for x in biomarker]) + '\t' + '\t'.join([str(x) for x in biomarker]) + '\n')
             current_idx += 1
+            #if False: #unique_idx_current==len(no_ld_idx):
+            #    break
+            #elif True: 
+            #    #current_idx==no_ld_idx[unique_idx_current]:
+            #    if True:#is_abundant[unique_idx_current]: 
+            #        f.write('\t'.join([variants[x] for x in biomarker]) + '\t' + '\t'.join([str(x) for x in biomarker]) + '\n')
+            #    unique_idx_current += 1
+            #    current_idx += 1
+
 print("Writing to files...")
 scipy.sparse.save_npz(asv_vs_biomarker_file_out, asv_biomarker)  # Save sparse matrix of ASV x biomarker.
 scipy.sparse.save_npz(person_biomarker_file_out, person_biomarker)  # Save sparse matrix of ASV x biomarker.
-
-
