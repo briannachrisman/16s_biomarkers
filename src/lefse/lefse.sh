@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=lefse
-#SBATCH --partition=owners
+#SBATCH --partition=dpwall
 #SBATCH --output=/scratch/users/briannac/logs/lefse.out
 #SBATCH --error=/scratch/users/briannac/logs/lefse.err
-#SBATCH --time=40:00:00
-#SBATCH --mem=200G
+#SBATCH --time=1:00:00
+#SBATCH --mem=100G
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=briannac@stanford.edu
 
@@ -12,8 +12,8 @@
 
 
 ml R/3.6.1
-
-for biomarker in asv taxa otu90 otu95 otu97 otu99 micropheno4 micropheno6 micropheno8 sbb1 sbb2; do
+ml python/3.6
+for biomarker in sbb2 sbb3; do
     for dataset in autism obesity; do
     
         \rm $MY_HOME/sequence_based_biomarkers/results/lefse/sample_vs_biomarker_lefse_${biomarker}_${dataset}.out

@@ -7,6 +7,6 @@
 
 ## Pipeline 
 
-1. ```lefse_format.sh```: Set up TSV files for lefse. 
+1. ```lefse_format.sh```: Set up TSV files for lefse (run on top 1000 most variable sets.)
 
-2. ```lefse.sh```: 
+2. ```lefse.sh```: Format lefse.in files and run lefse.
