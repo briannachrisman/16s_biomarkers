@@ -63,4 +63,4 @@ print('max pval permute: ', max(pvals_total))
 #np.save(BIOMARKER_DIR + 'intermediate_files/nonparametric_pvalues/%s_%s/false_discovery_count_%s_%s_%i.npy' % (dataset, biomarker, dataset, biomarker, SEED_IDX), pvals_count)
 np.savetxt(BIOMARKER_DIR + 'intermediate_files/nonparametric_pvalues/%s_%s/permuted_rank_stat_%s_%s_%i.txt' % (dataset, biomarker, dataset, biomarker, SEED_IDX), pvals_total)
 
-print('saved at ', BIOMARKER_DIR + 'intermediate_files/nonparametric_pvalues/%s_%s/false_discovery_count_%s_%s_%i.npy' % (dataset, biomarker, dataset, biomarker, SEED_IDX))
+print('saved at ', BIOMARKER_DIR + 'intermediate_files/nonparametric_pvalues/%s_%s/permuted_rank_stat_%s_%s_%i.npy' % (dataset, biomarker, dataset, biomarker, SEED_IDX))
