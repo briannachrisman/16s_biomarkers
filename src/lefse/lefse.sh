@@ -13,7 +13,7 @@
 
 ml R/3.6.1
 ml python/3.6
-for biomarker in sbb2 sbb3; do
+for biomarker in ditaxa; do #sbb2 sbb3; do
     for dataset in autism obesity; do
     
         \rm $MY_HOME/sequence_based_biomarkers/results/lefse/sample_vs_biomarker_lefse_${biomarker}_${dataset}.out

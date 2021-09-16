@@ -3,7 +3,7 @@ import pandas as pd
 import scipy.sparse
 BIOMARKER_DIR = '/home/groups/dpwall/briannac/sequence_based_biomarkers/'
 
-for biomarker_type in ['micropheno4', 'micropheno6', 'micropheno8', 'taxa', 'asv', 'otu90', 'otu95', 'otu97', 'otu99', 'sbb1', 'sbb2', 'sbb3']:
+for biomarker_type in ['ditaxa']:#'micropheno4', 'micropheno6', 'micropheno8', 'taxa', 'asv', 'otu90', 'otu95', 'otu97', 'otu99', 'sbb1', 'sbb2', 'sbb3']:
     for dataset in ['obesity', 'autism']:
         print(biomarker_type, dataset)
         sample_vs_biomarker = scipy.sparse.load_npz(BIOMARKER_DIR + 'results/generate_biomarkers/sample_vs_biomarker_%s_%s.npz' % (biomarker_type, dataset))

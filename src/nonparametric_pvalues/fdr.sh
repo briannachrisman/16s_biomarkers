@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=fdr
-#SBATCH --partition=dpwall
-#SBATCH --array=1-10%5
+#SBATCH --partition=owners
+#SBATCH --array=1-10
 #SBATCH --output=/scratch/users/briannac/logs/fdr.out
 #SBATCH --error=/scratch/users/briannac/logs/fdr.err
 #SBATCH --time=40:00:00
@@ -14,7 +14,7 @@
 ml python/3.6
 #START=$((SLURM_ARRAY_TASK_ID*100-100))
 #END=$((START+100))
-for biomarker in otu95 otu97 otu99 micropheno4 micropheno6 micropheno8 sbb1 sbb2 sbb3; do #  ; do
+for biomarker in ditaxa; do # otu95 otu97 otu99 micropheno4 micropheno6 micropheno8 sbb1 sbb2 sbb3; do #  ; do
     for dataset in obesity autism; do
         echo $dataset $biomarker
         mkdir $MY_HOME/sequence_based_biomarkers/intermediate_files/nonparametric_pvalues/${dataset}_${biomarker}
